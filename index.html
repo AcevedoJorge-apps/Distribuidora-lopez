@@ -83,6 +83,8 @@ button{cursor:pointer} .btn{background:#111;color:#fff;border:0;padding:11px 10p
 </div>
 <div id="sec-mapa" class="seccion">
   <div class="card">
+    <div style="background:#111;color:#fff;padding:10px;border-radius:10px;text-align:center;font-weight:800;margin-bottom:8px">🗺️ Mostrando pines de: <span id="mapaDia" style="color:#FFD500">Todos</span> <span id="mapaCant"></span></div>
+    <div class="filtros" id="filtrosDiasMapa"></div>
     <div class="row" style="margin-bottom:6px">
       <button id="btnGPS" class="btn btn-gps-off" onclick="toggleGPS()">🛰️ Activar GPS</button>
       <button class="btn btn-blue" onclick="irAMiUbicacion()">📍 Mi Ubicación</button>
@@ -221,7 +223,6 @@ function verEnMapa(id){
   mostrar('mapa');
   setTimeout(()=>{ if(mapa){ mapa.setView([c.lat, c.lng], 16); } }, 400);
 }
-// CORRECCION 1 - EDITAR VISITA
 function abrirEditarVisita(id){
   let v = visitas.find(x=>x.clienteId==id && x.fecha==hoy); if(!v){ alert('Hoy todavía no lo visitaste'); return; }
   clienteActual = id;
@@ -281,7 +282,6 @@ function usarMiUbicacionEditar(){
   if(!navigator.geolocation){ alert('Sin GPS. Mantené apretado 2 seg en el mapa.'); return; }
   navigator.geolocation.getCurrentPosition(p=>{ fijarUbicacionEditar(p.coords.latitude, p.coords.longitude); }, ()=>alert('No se pudo obtener ubicación'), {enableHighAccuracy:true, timeout:10000});
 }
-// CORRECCION 2 - BUSCAR DIRECCION MANUAL
 async function buscarDireccionTexto(texto){
   let q=encodeURIComponent(texto+', Córdoba, Argentina');
   let r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+q, {headers:{'Accept':'application/json'}});
@@ -346,6 +346,7 @@ function confirmarNoCompro(){ if(!motivoSel){ alert('Elegí un motivo'); return;
 function render(){
   let dias=['Todos','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   let fh=''; dias.forEach(d=>{ fh+=`<button class="${filtroDia==d?'act':''}" onclick="filtrarDia('${d}')">${d=='Todos'?'Todos':d.slice(0,3)}</button>`; }); document.getElementById('filtrosDias').innerHTML=fh;
+  let fm=document.getElementById('filtrosDiasMapa'); if(fm) fm.innerHTML=fh;
   let q=(document.getElementById('buscador').value||'').toLowerCase();
   let delDia=clientes.filter(c=> filtroDia=='Todos' || (c.dia||'')==filtroDia);
   let list=delDia.filter(c=> (c.nombre+' '+(c.dir||'')).toLowerCase().includes(q));
@@ -390,7 +391,10 @@ function dibujarMarcadores(){
   marcadores.forEach(m=>mapa.removeLayer(m)); marcadores=[];
   if(pinNuevo) mapa.removeLayer(pinNuevo); if(pinEditar) mapa.removeLayer(pinEditar);
   pinNuevo=null; pinEditar=null;
-  clientes.forEach(c=>{
+  let visibles = clientes.filter(c=> filtroDia=='Todos' || (c.dia||'')==filtroDia);
+  let elDia=document.getElementById('mapaDia'); if(elDia) elDia.innerText=filtroDia;
+  let elCant=document.getElementById('mapaCant'); if(elCant) elCant.innerText='('+visibles.filter(c=>c.lat!=null).length+' pines)';
+  visibles.forEach(c=>{
     if(c.lat==null) return;
     let v=visitas.find(x=>x.clienteId==c.id && x.fecha==hoy);
     let cls=v ? (v.compro?'pin-verde':'pin-rojo') : 'pin-amarillo';
