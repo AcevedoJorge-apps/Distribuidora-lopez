@@ -63,6 +63,8 @@ button{cursor:pointer} .btn{background:#111;color:#fff;border:0;padding:11px 10p
 .firma b{font-size:20px;letter-spacing:2px;color:#fff}
 .firma span{color:#D9A441;font-size:13px;letter-spacing:3px;font-weight:800;display:block;margin-top:4px}
 .firma small{color:#BBB;font-size:13px;display:block;margin-top:8px}
+.btn-pend{font-size:12px !important;padding:6px 10px !important;width:auto !important;border-radius:20px !important;white-space:nowrap}
+.btn-pend.on{background:#111 !important;color:#FFD500 !important}
 </style>
 </head>
 <body>
@@ -72,7 +74,7 @@ button{cursor:pointer} .btn{background:#111;color:#fff;border:0;padding:11px 10p
 <button id="tabMapa" onclick="mostrar('mapa')">🗺️ Mapa</button>
 </div>
 <div id="sec-lista" class="seccion act">
-  <div class="buscador-fijo"><input type="text" id="buscador" placeholder="🔍 Buscar cliente..." oninput="render()"></div>
+  <div class="buscador-fijo"><div style="display:flex;gap:6px;align-items:center"><input type="text" id="buscador" placeholder="🔍 Buscar cliente..." oninput="render()" style="flex:1"><button id="btnPendientes" class="btn btn-pend" onclick="togglePendientes()">📋 Pendientes del día</button></div></div>
   <div class="contadores" id="resumen"></div>
   <div class="filtros" id="filtrosDias" style="margin-top:12px"></div>
   <div id="lista"></div>
@@ -168,6 +170,7 @@ let _f = new Date();
 let hoy = _f.getFullYear() + '-' + String(_f.getMonth()+1).padStart(2,'0') + '-' + String(_f.getDate()).padStart(2,'0');
 let fechaLinda = _f.toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
 let filtroDia = 'Todos';
+let soloPendientes = false;
 let clienteActual = null;
 let clienteEditarId = null;
 let motivoSel = '';
@@ -180,12 +183,14 @@ let clienteParaCentrar = null;
 let pinNuevo = null, pinEditar = null;
 let miMarker = null;
 let gpsActivo = false;
+let siguiendoGPS = false;
 let gpsWatchId = null;
 let motivos = ['Tiene stock','No tiene plata','No estaba / Cerrado','Precio alto','Compró a otro','Pidió para la próxima','Otro'];
 document.getElementById('fechaHoy').innerText = fechaLinda + ' - ' + hoy;
 function guardar(){ localStorage.setItem('lopez_clientes', JSON.stringify(clientes)); localStorage.setItem('lopez_visitas', JSON.stringify(visitas)); }
 function horaAhora(){ return new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}); }
 function formatearFecha(f){ if(!f) return ''; let p=f.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+function togglePendientes(){ soloPendientes = !soloPendientes; let b=document.getElementById('btnPendientes'); if(b) b.classList.toggle('on', soloPendientes); render(); }
 function mostrar(sec){
   document.querySelectorAll('.seccion').forEach(s=>s.classList.remove('act'));
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('act'));
@@ -233,211 +238,4 @@ function verHistorial(id){
     else listaHtml += '<div class="histItem">❌ <b>'+formatearFecha(v.fecha)+' '+(v.hora||'')+'</b><br>NO COMPRÓ: '+(v.motivo||'')+'</div>';
   });
   document.getElementById('histLista').innerHTML = listaHtml;
-  document.getElementById('modalHistorial').classList.add('open');
-}
-function verEnMapa(id){
-  let c = clientes.find(x=>x.id==id); if(!c) return;
-  if(c.lat==null || c.lng==null){ alert('Este cliente no tiene ubicación en el mapa. Editalo para ubicarlo.'); return; }
-  clienteParaCentrar = c;
-  mostrar('mapa');
-  setTimeout(()=>{ if(mapa){ mapa.setView([c.lat, c.lng], 16); } }, 400);
-}
-function abrirEditarVisita(id){
-  let v = visitas.find(x=>x.clienteId==id && x.fecha==hoy); if(!v){ alert('Hoy todavía no lo visitaste'); return; }
-  clienteActual = id;
-  let c = clientes.find(x=>x.id==id);
-  document.getElementById('tituloEditarVisita').innerText = '✏️ Corregir visita: '+c.nombre;
-  document.getElementById('editTipo').value = v.compro ? 'compro' : 'nocompro';
-  document.getElementById('editMonto').value = v.monto||'';
-  motivoEditSel = v.motivo||'';
-  let h=''; motivos.forEach(m=>{ h+=`<div class="motivo ${m==motivoEditSel?'sel':''}" onclick="seleccionarMotivoEdit(this,'${m}')">${m}</div>`; });
-  document.getElementById('editMotivos').innerHTML=h;
-  actualizarEditTipo();
-  document.getElementById('modalEditarVisita').classList.add('open');
-}
-function actualizarEditTipo(){
-  let t=document.getElementById('editTipo').value;
-  document.getElementById('editBoxMonto').style.display = t=='compro' ? 'block' : 'none';
-  document.getElementById('editBoxMotivo').style.display = t=='nocompro' ? 'block' : 'none';
-}
-document.addEventListener('change',e=>{ if(e.target && e.target.id=='editTipo') actualizarEditTipo(); });
-function seleccionarMotivoEdit(el,m){ document.querySelectorAll('#editMotivos .motivo').forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); motivoEditSel=m; }
-function guardarEdicionVisita(){
-  let v = visitas.find(x=>x.clienteId==clienteActual && x.fecha==hoy); if(!v) return;
-  let tipo=document.getElementById('editTipo').value;
-  if(tipo=='compro'){
-    let monto=parseFloat(document.getElementById('editMonto').value||'0');
-    if(!monto){ alert('Poné el monto'); return; }
-    v.compro=true; v.monto=monto; v.motivo=''; v.hora=horaAhora();
-  } else {
-    if(!motivoEditSel){ alert('Elegí un motivo'); return; }
-    v.compro=false; v.monto=0; v.motivo=motivoEditSel; v.hora=horaAhora();
-  }
-  guardar(); cerrarModal(); render(); alert('Visita corregida ✅');
-}
-function borrarVisitaHoy(){
-  if(!confirm('¿Borrar la visita de hoy y dejarlo como pendiente?')) return;
-  visitas=visitas.filter(x=>!(x.clienteId==clienteActual && x.fecha==hoy));
-  guardar(); cerrarModal(); render();
-}
-function editarCliente(id){
-  let c = clientes.find(x=>x.id==id); if(!c) return;
-  clienteEditarId = id; latEditar = c.lat; lngEditar = c.lng; clienteParaCentrar = c;
-  document.getElementById('eNombre').value = c.nombre||''; document.getElementById('eDir').value = c.dir||''; document.getElementById('eTel').value = c.tel||''; document.getElementById('eDia').value = c.dia||'';
-  actualizarCoordEditar(); document.getElementById('cardEditar').style.display = 'block'; document.getElementById('cardNuevo').style.display = 'none';
-  mostrar('mapa'); setTimeout(()=>{ document.getElementById('cardEditar').scrollIntoView({behavior:'smooth'}); }, 400);
-}
-function actualizarCoordEditar(){
-  if(latEditar!=null && lngEditar!=null){ document.getElementById('eCoord').innerHTML = `<div class="coord-edit">🟠 Ubicación actual: ${latEditar.toFixed(6)}, ${lngEditar.toFixed(6)}<br><small>Si está mal, mantené apretado 2 seg en el lugar correcto del mapa</small></div>`; }
-  else { document.getElementById('eCoord').innerHTML = `<div class="aviso-ubicacion">⚠️ Este cliente no tiene ubicación. Mantené apretado 2 seg en el mapa en el lugar correcto, o tocá “Reubicar donde estoy ahora”.</div>`; }
-}
-function fijarUbicacionEditar(lat, lng){
-  latEditar = lat; lngEditar = lng; actualizarCoordEditar();
-  if(mapa){ if(pinEditar) mapa.removeLayer(pinEditar); let icono = L.divIcon({className:'', html:`<div class="pin pin-editar"><span>✏️</span></div>`, iconSize:[36,36], iconAnchor:[18,36], popupAnchor:[0,-34]}); pinEditar = L.marker([lat,lng], {icon: icono}).addTo(mapa).bindPopup(`<b>🟠 Ubicación nueva</b><br>${lat.toFixed(6)}, ${lng.toFixed(6)}`).openPopup(); }
-  if(navigator.vibrate) navigator.vibrate(80);
-}
-function usarMiUbicacionEditar(){
-  if(miLat!=null){ fijarUbicacionEditar(miLat, miLng); return; }
-  if(!navigator.geolocation){ alert('Sin GPS. Mantené apretado 2 seg en el mapa.'); return; }
-  navigator.geolocation.getCurrentPosition(p=>{ fijarUbicacionEditar(p.coords.latitude, p.coords.longitude); }, ()=>alert('No se pudo obtener ubicación'), {enableHighAccuracy:true, timeout:10000});
-}
-async function buscarDireccionTexto(texto){
-  let q=encodeURIComponent(texto+', Córdoba, Argentina');
-  let r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+q, {headers:{'Accept':'application/json'}});
-  let j=await r.json(); return j;
-}
-async function buscarDireccionNuevo(){
-  let d=document.getElementById('nDir').value.trim();
-  if(!d){ alert('Primero escribí la dirección. Ej: Av Colón 123'); return; }
-  try{
-    let j=await buscarDireccionTexto(d);
-    if(j.length){ fijarUbicacionNueva(parseFloat(j[0].lat), parseFloat(j[0].lon), '📌 '+j[0].display_name.split(',')[0]); if(mapa) mapa.setView([parseFloat(j[0].lat), parseFloat(j[0].lon)],16); }
-    else alert('No encontré esa dirección. Probá con altura y barrio. Ej: Duarte Quirós 2272, Córdoba');
-  }catch(e){ alert('Sin internet para buscar la dirección. Mantené apretado 2 seg en el mapa.'); }
-}
-async function buscarDireccionEditar(){
-  let d=document.getElementById('eDir').value.trim();
-  if(!d){ alert('Primero escribí la dirección. Ej: Av Colón 123'); return; }
-  try{
-    let j=await buscarDireccionTexto(d);
-    if(j.length){ fijarUbicacionEditar(parseFloat(j[0].lat), parseFloat(j[0].lon)); if(mapa) mapa.setView([parseFloat(j[0].lat), parseFloat(j[0].lon)],16); }
-    else alert('No encontré esa dirección. Probá con altura y barrio.');
-  }catch(e){ alert('Sin internet para buscar la dirección. Mantené apretado 2 seg en el mapa.'); }
-}
-function confirmarEditar(){
-  let nombre = document.getElementById('eNombre').value.trim(); if(!nombre){ alert('Poné el nombre'); return; }
-  let c = clientes.find(x=>x.id==clienteEditarId); if(!c) return;
-  c.nombre = nombre; c.dir = document.getElementById('eDir').value.trim(); c.tel = document.getElementById('eTel').value.trim(); c.dia = document.getElementById('eDia').value; c.lat = latEditar; c.lng = lngEditar;
-  guardar(); cancelarEditar(); render(); alert('Cliente actualizado ✅'); mostrar('lista');
-}
-function cancelarEditar(){ clienteEditarId = null; latEditar=null; lngEditar=null; document.getElementById('cardEditar').style.display = 'none'; document.getElementById('cardNuevo').style.display = 'block'; if(pinEditar && mapa){ mapa.removeLayer(pinEditar); pinEditar=null; } }
-function toggleGPS(){
-  if(!navigator.geolocation){ alert('Tu celu no tiene GPS'); return; }
-  if(!gpsActivo){ gpsActivo = true; document.getElementById('btnGPS').innerText = '🛑 Desactivar GPS'; document.getElementById('btnGPS').className = 'btn btn-gps-on'; document.getElementById('gpsEstado').innerText = '🟢 GPS activado - te estoy siguiendo...'; document.getElementById('gpsEstado').className = 'gps-estado on'; gpsWatchId = navigator.geolocation.watchPosition(p=>{ miLat = p.coords.latitude; miLng = p.coords.longitude; actualizarMiMarker(true); }, ()=>{ document.getElementById('gpsEstado').innerText = '⚠️ No pude ubicarte.'; }, {enableHighAccuracy:true, maximumAge:3000, timeout:10000}); }
-  else { gpsActivo = false; if(gpsWatchId!==null) navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId = null; document.getElementById('btnGPS').innerText = '🛰️ Activar GPS'; document.getElementById('btnGPS').className = 'btn btn-gps-off'; document.getElementById('gpsEstado').innerText = 'GPS apagado. Tocá Activar GPS para que te siga.'; document.getElementById('gpsEstado').className = 'gps-estado'; if(miMarker && mapa){ mapa.removeLayer(miMarker); miMarker=null; } }
-}
-function actualizarMiMarker(centrar){ if(!mapa || miLat==null) return; if(miMarker) mapa.removeLayer(miMarker); let miPin = L.divIcon({className:'', html:`<div class="pin pin-miubicacion"><span>📍</span></div>`, iconSize:[36,36], iconAnchor:[18,36]}); miMarker = L.marker([miLat,miLng], {icon: miPin}).addTo(mapa).bindPopup('📍 Estás acá'); if(centrar) mapa.setView([miLat,miLng],16); }
-function irAMiUbicacion(){ if(miLat==null || miLng==null){ if(!gpsActivo) toggleGPS(); else alert('Esperá un seg que estoy buscando tu ubicación...'); return; } if(mapa) mapa.setView([miLat,miLng],16); if(miMarker) miMarker.openPopup(); }
-function fijarUbicacionNueva(lat,lng,txt){
-  latNuevo=lat; lngNuevo=lng;
-  document.getElementById('coordNuevo').innerHTML = `<div class="coord-ok">📍 ${txt||'Ubicación marcada'}: ${lat.toFixed(6)}, ${lng.toFixed(6)}</div>`;
-  if(mapa){ if(pinNuevo) mapa.removeLayer(pinNuevo); let icono = L.divIcon({className:'', html:`<div class="pin pin-nuevo"><span>🟣</span></div>`, iconSize:[36,36], iconAnchor:[18,36]}); pinNuevo = L.marker([lat,lng], {icon: icono}).addTo(mapa).bindPopup(`<b>${txt||'Nuevo cliente'}</b>`).openPopup(); }
-  if(navigator.vibrate) navigator.vibrate(80);
-}
-function limpiarUbicacionNueva(){ latNuevo=null; lngNuevo=null; document.getElementById('coordNuevo').innerHTML=''; if(pinNuevo && mapa){ mapa.removeLayer(pinNuevo); pinNuevo=null; } }
-function usarMiUbicacionNuevo(){
-  if(miLat!=null){ fijarUbicacionNueva(miLat, miLng, '📍 Tu ubicación actual'); return; }
-  if(!navigator.geolocation){ alert('Sin GPS. Mantené apretado 2 seg en el mapa.'); return; }
-  navigator.geolocation.getCurrentPosition(p=>{ fijarUbicacionNueva(p.coords.latitude, p.coords.longitude, '📍 Tu ubicación actual'); }, ()=>alert('No se pudo. Mantené apretado 2 seg en el mapa.'), {enableHighAccuracy:true, timeout:10000});
-}
-function guardarCliente(){
-  let nombre = document.getElementById('nNombre').value.trim(); if(!nombre){ alert('Poné el nombre'); return; }
-  if(latNuevo==null){ alert('Primero buscá la dirección o marcá la ubicación en el mapa (mantené apretado 2 seg) o tocá Usar mi ubicación'); return; }
-  clientes.push({id:Date.now(), nombre, dir:document.getElementById('nDir').value.trim(), tel:document.getElementById('nTel').value.trim(), dia:document.getElementById('nDia').value, lat:latNuevo, lng:lngNuevo});
-  guardar(); document.getElementById('nNombre').value=''; document.getElementById('nDir').value=''; document.getElementById('nTel').value=''; document.getElementById('nDia').value=''; limpiarUbicacionNueva(); render(); alert('Cliente guardado ✅'); mostrar('lista');
-}
-function borrarCliente(id){ let c=clientes.find(x=>x.id==id); if(confirm('¿Borrar a '+c.nombre+'?')){ clientes=clientes.filter(x=>x.id!=id); visitas=visitas.filter(v=>v.clienteId!=id); guardar(); render(); } }
-function abrirCompro(id){ clienteActual=id; let c=clientes.find(x=>x.id==id); document.getElementById('tituloCompro').innerText='¿Cuánto compró '+c.nombre+'?'; document.getElementById('inputMonto').value=''; document.getElementById('modalCompro').classList.add('open'); setTimeout(()=>document.getElementById('inputMonto').focus(),200); }
-function confirmarCompro(){ let monto=parseFloat(document.getElementById('inputMonto').value||'0'); if(!monto){ alert('Poné el monto'); return; } visitas.push({clienteId:clienteActual, fecha:hoy, hora:horaAhora(), compro:true, monto}); guardar(); cerrarModal(); render(); }
-function abrirNoCompro(id){ clienteActual=id; let c=clientes.find(x=>x.id==id); document.getElementById('tituloNoCompro').innerText='¿Por qué no compró '+c.nombre+'?'; motivoSel=''; let html=''; motivos.forEach(m=>{ html+=`<div class="motivo" onclick="seleccionarMotivo(this,'${m}')">${m}</div>`; }); document.getElementById('listaMotivos').innerHTML=html; document.getElementById('modalNoCompro').classList.add('open'); }
-function seleccionarMotivo(el,m){ document.querySelectorAll('.motivo').forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); motivoSel=m; }
-function confirmarNoCompro(){ if(!motivoSel){ alert('Elegí un motivo'); return; } visitas.push({clienteId:clienteActual, fecha:hoy, hora:horaAhora(), compro:false, monto:0, motivo:motivoSel}); guardar(); cerrarModal(); render(); }
-function render(){
-  let dias=['Todos','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  let fh=''; dias.forEach(d=>{ fh+=`<button class="${filtroDia==d?'act':''}" onclick="filtrarDia('${d}')">${d=='Todos'?'Todos':d.slice(0,3)}</button>`; }); document.getElementById('filtrosDias').innerHTML=fh;
-  let fm=document.getElementById('filtrosDiasMapa'); if(fm) fm.innerHTML=fh;
-  let q=(document.getElementById('buscador').value||'').toLowerCase();
-  let delDia=clientes.filter(c=> filtroDia=='Todos' || (c.dia||'')==filtroDia);
-  let list=delDia.filter(c=> (c.nombre+' '+(c.dir||'')).toLowerCase().includes(q));
-  let vHoy=visitas.filter(v=>v.fecha==hoy);
-  let comp=vHoy.filter(v=>v.compro);
-  let total=vHoy.reduce((s,v)=>s+(v.monto||0),0);
-  let pendientes=delDia.filter(c=> !visitas.find(v=>v.clienteId==c.id && v.fecha==hoy));
-  document.getElementById('resumen').innerHTML = `<div class="fila"><div class="caja"><b>${vHoy.length}</b><small>VISITADOS HOY</small></div><div class="caja"><b>${comp.length}</b><small>COMPRARON</small></div><div class="caja"><b>${pendientes.length}</b><small>PENDIENTES</small></div></div><div class="ventas"><small>💰 VENDIDO HOY</small><b>$${total.toLocaleString('es-AR')}</b></div>`;
-  let html='';
-  list.forEach(c=>{
-    let v=visitas.find(x=>x.clienteId==c.id && x.fecha==hoy);
-    let clase=v ? (v.compro?'compro':'nocompro') : '';
-    let estado=v ? (v.compro? `<div class="ok">✅ COMPRÓ $${v.monto.toLocaleString('es-AR')} - ${v.hora||''}</div>` : `<div class="no">❌ NO COMPRÓ: ${v.motivo} - ${v.hora||''}</div>`) : '<div style="color:#888;font-weight:700;margin:8px 0">⏳ Sin visitar hoy</div>';
-    let histC=visitas.filter(x=>x.clienteId==c.id).sort((a,b)=> (b.fecha+' '+(b.hora||'')).localeCompare(a.fecha+' '+(a.hora||'')));
-    let ultCompra=histC.find(x=>x.compro); let ultNo=histC.find(x=>!x.compro);
-    let miniHist='';
-    if(ultCompra) miniHist+=`<small>🟢 Últ. compra: ${formatearFecha(ultCompra.fecha)} - $${ultCompra.monto.toLocaleString('es-AR')}</small><br>`;
-    if(ultNo) miniHist+=`<small>🔴 Últ. no compra: ${formatearFecha(ultNo.fecha)} - ${ultNo.motivo}</small><br>`;
-    let dis=v?'disabled style="opacity:.5"':'';
-    let wsBtn = c.tel ? `<div class="row" style="margin-top:8px"><button class="btn btn-ws" onclick="window.open('${whatsappLink(c.tel)}','_blank')">💬 WhatsApp</button></div>` : '';
-    let btnCorregir = v ? `<div class="row" style="margin-top:8px"><button class="btn btn-naranja" onclick="abrirEditarVisita(${c.id})">✏️ Corregir visita de hoy</button></div>` : '';
-    html+=`<div class="card cliente ${clase}"><b>${c.nombre}</b> ${c.dia?`<span class="badge">📅 ${c.dia}</span>`:''}<br><small>${c.dir||''} ${c.tel?' - '+c.tel:''}</small><br>${miniHist}${estado}<div class="row" style="margin-top:8px"><button class="btn btn-green" ${dis} onclick="abrirCompro(${c.id})">✅ COMPRÓ</button><button class="btn" style="background:#D92D20;color:#fff" ${dis} onclick="abrirNoCompro(${c.id})">❌ NO COMPRÓ</button></div><div class="row" style="margin-top:8px"><button class="btn btn-gray btn-mas" onclick="toggleOpciones(${c.id}, this)">⋯ Más opciones</button></div><div id="op-${c.id}" class="opciones-extra">${wsBtn}${btnCorregir}<div class="row" style="margin-top:8px"><button class="btn btn-violeta" onclick="verHistorial(${c.id})">📜 Historial</button><button class="btn btn-blue" onclick="verEnMapa(${c.id})">🗺️ Ver en mapa</button></div><div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="editarCliente(${c.id})">✏️ Editar cliente</button><button class="btn btn-gray" onclick="borrarCliente(${c.id})">🗑️ Borrar</button></div></div></div>`;
-  });
-  document.getElementById('lista').innerHTML = html || '<div class="card">No hay clientes. Si filtraste por día, probá con Todos.</div>';
-  if(mapa) dibujarMarcadores();
-}
-function filtrarDia(d){ filtroDia=d; render(); }
-function initMapa(){
-  if(mapa){ mapa.invalidateSize(); dibujarMarcadores(); return; }
-  mapa = L.map('map').setView([-31.416,-64.183],12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(mapa);
-  let pressTimer=null;
-  mapa.on('mousedown',e=>{ pressTimer=setTimeout(()=>{ if(clienteEditarId!=null) fijarUbicacionEditar(e.latlng.lat, e.latlng.lng); else fijarUbicacionNueva(e.latlng.lat, e.latlng.lng, '📌 Ubicación marcada'); },900); });
-  mapa.on('mouseup',()=>clearTimeout(pressTimer));
-  mapa.on('touchstart',e=>{ pressTimer=setTimeout(()=>{ if(clienteEditarId!=null) fijarUbicacionEditar(e.latlng.lat, e.latlng.lng); else fijarUbicacionNueva(e.latlng.lat, e.latlng.lng, '📌 Ubicación marcada'); },900); });
-  mapa.on('touchend',()=>clearTimeout(pressTimer));
-  dibujarMarcadores();
-  if(clienteParaCentrar){ mapa.setView([clienteParaCentrar.lat, clienteParaCentrar.lng],16); clienteParaCentrar=null; }
-  if(miLat!=null) actualizarMiMarker(false);
-}
-function dibujarMarcadores(){
-  if(!mapa) return;
-  marcadores.forEach(m=>mapa.removeLayer(m)); marcadores=[];
-  if(pinNuevo) mapa.removeLayer(pinNuevo); if(pinEditar) mapa.removeLayer(pinEditar);
-  pinNuevo=null; pinEditar=null;
-  let visibles = clientes.filter(c=> filtroDia=='Todos' || (c.dia||'')==filtroDia);
-  let elDia=document.getElementById('mapaDia'); if(elDia) elDia.innerText=filtroDia;
-  let elCant=document.getElementById('mapaCant'); if(elCant) elCant.innerText='('+visibles.filter(c=>c.lat!=null).length+' pines)';
-  visibles.forEach(c=>{
-    if(c.lat==null) return;
-    let v=visitas.find(x=>x.clienteId==c.id && x.fecha==hoy);
-    let cls=v ? (v.compro?'pin-verde':'pin-rojo') : 'pin-amarillo';
-    let letra=v ? (v.compro?'$':'X') : '•';
-    let icono=L.divIcon({className:'', html:`<div class="pin ${cls}"><span>${letra}</span></div>`, iconSize:[36,36], iconAnchor:[18,36], popupAnchor:[0,-34]});
-    let mk=L.marker([c.lat,c.lng],{icon:icono}).addTo(mapa).bindPopup(`<b>${c.nombre}</b><br>${c.dir||''}<br>${c.dia||''}<br><button onclick="verHistorial(${c.id})">📜 Ver historial</button> <button onclick="verEnMapa(${c.id})">🗺️ Ver en mapa</button>`);
-    marcadores.push(mk);
-  });
-  if(latNuevo!=null) fijarUbicacionNueva(latNuevo,lngNuevo,'📌 Ubicación marcada');
-  if(latEditar!=null) fijarUbicacionEditar(latEditar,lngEditar);
-}
-function exportarCSV(){
-  let csv='Fecha;Hora;Cliente;Dia;Direccion;Telefono;Compro;Monto;Motivo\n';
-  visitas.forEach(v=>{ let c=clientes.find(x=>x.id==v.clienteId)||{}; csv+=`${v.fecha};${v.hora||''};${c.nombre||''};${c.dia||''};${c.dir||''};${c.tel||''};${v.compro?'SI':'NO'};${v.monto||0};${v.motivo||''}\n`; });
-  let blob=new Blob(['\ufeff'+csv],{type:'text/csv'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lopez_visitas.csv'; a.click();
-}
-function exportarCopia(){ let data=JSON.stringify({clientes, visitas}); let blob=new Blob([data],{type:'application/json'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='lopez_copia.json'; a.click(); alert('Copia guardada ✅'); }
-function recuperar(e){ let f=e.target.files[0]; if(!f) return; let r=new FileReader(); r.onload=()=>{ try{ let d=JSON.parse(r.result); if(d.clientes) clientes=d.clientes; if(d.visitas) visitas=d.visitas; guardar(); render(); alert('Copia recuperada ✅'); }catch(err){ alert('Ese archivo no es una copia válida'); } }; r.readAsText(f); e.target.value=''; }
-function importarCSV(e){
-  let f=e.target.files[0]; if(!f) return; let r=new FileReader(); r.onload=()=>{ let lineas=r.result.split('\n'); let nuevos=0; lineas.forEach((lin,i)=>{ if(i==0) return; let p=lin.split(';'); if(p.length<2 || !p[0].trim()) return; let lat=parseFloat(p[4]); let lng=parseFloat(p[5]); clientes.push({id:Date.now()+i, nombre:p[0].trim(), dia:p[1]?p[1].trim():'', dir:p[2]?p[2].trim():'', tel:p[3]?p[3].trim():'', lat:isNaN(lat)?null:lat, lng:isNaN(lng)?null:lng}); nuevos++; }); guardar(); render(); alert('Importados '+nuevos+' clientes ✅'); }; r.readAsText(f); e.target.value='';
-}
-function descargarEjemploCSV(){ let csv='Nombre;Dia;Direccion;Telefono;Latitud;Longitud\nKiosco Juan;Lunes;Av Colón 123;3511234567;-31.421234;-64.188765\nAlmacén Pérez;Martes;San Martín 456;;-31.415;-64.19\n'; let blob=new Blob(['\ufeff'+csv],{type:'text/csv'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ejemplo_lopez.csv'; a.click(); }
-render();
-</script>
-</body>
-</html>
+  document.getElementById('modalHistorial'
