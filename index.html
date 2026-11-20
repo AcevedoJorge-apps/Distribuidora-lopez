@@ -103,22 +103,23 @@ button{cursor:pointer} .btn{background:#111;color:#fff;border:0;padding:11px 10p
     <h3 style="margin:0">✏️ Editando cliente en el mapa</h3>
     <small style="color:#555;font-weight:600">Lo ves arriba en el mapa con pin naranja. Si está mal ubicado, mantené apretado 2 seg en el lugar correcto para reubicarlo. Cambiá los datos y guardá.</small>
     <input id="eNombre" placeholder="Nombre / Negocio *">
-    <input id="eDir" placeholder="Dirección">
+    <input id="eDir" placeholder="Dirección - Ej: Duarte Quirós 2272, Córdoba">
     <input id="eTel" placeholder="Teléfono / WhatsApp">
     <select id="eDia"><option value="">Día de visita</option><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option></select>
     <div id="eCoord"></div>
-    <div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="usarMiUbicacionEditar()">📍 Reubicar donde estoy ahora</button></div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-blue" onclick="buscarDireccionEditar()">🔍 Buscar esta dirección en el mapa</button><button class="btn btn-gray" onclick="usarMiUbicacionEditar()">📍 Donde estoy ahora</button></div>
     <div class="row" style="margin-top:12px"><button class="btn btn-gray" onclick="cancelarEditar()">Cancelar</button><button class="btn btn-naranja" onclick="confirmarEditar()">💾 Guardar Cambios</button></div>
   </div>
   <div class="card" id="cardNuevo">
     <h3 style="margin:0">➕ Nuevo Cliente - acá mismo en el mapa</h3>
-    <small style="color:#555;font-weight:600">Primero marcá la ubicación en el mapa, después completá los datos y guardá.</small>
+    <small style="color:#555;font-weight:600">Escribí la dirección y tocá Buscar, o marcá la ubicación en el mapa, después completá los datos y guardá.</small>
     <input id="nNombre" placeholder="Nombre / Negocio *">
-    <input id="nDir" placeholder="Dirección (si la sabés, si no dejala vacía)">
+    <input id="nDir" placeholder="Dirección - Ej: Av Colón 123, Córdoba">
     <input id="nTel" placeholder="Teléfono / WhatsApp">
     <select id="nDia"><option value="">Día de visita</option><option>Lunes</option><option>Martes</option><option>Miércoles</option><option>Jueves</option><option>Viernes</option><option>Sábado</option></select>
     <div id="coordNuevo"></div>
-    <div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="usarMiUbicacionNuevo()">📍 Usar mi ubicación</button><button class="btn btn-violeta" onclick="guardarCliente()">✅ Guardar Cliente con esta ubicación</button></div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-blue" onclick="buscarDireccionNuevo()">🔍 Buscar dirección en el mapa</button><button class="btn btn-gray" onclick="usarMiUbicacionNuevo()">📍 Usar mi ubicación</button></div>
+    <div class="row" style="margin-top:8px"><button class="btn btn-violeta" onclick="guardarCliente()">✅ Guardar Cliente con esta ubicación</button></div>
     <div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="limpiarUbicacionNueva()" style="font-size:15px;padding:8px">🧹 Borrar pin violeta</button></div>
   </div>
   <div class="card"><h3 style="margin:0 0 8px">Importar CSV con coordenadas</h3>
@@ -148,6 +149,15 @@ button{cursor:pointer} .btn{background:#111;color:#fff;border:0;padding:11px 10p
   <div id="histLista" style="margin-top:10px"></div>
   <div class="row" style="margin-top:12px"><button class="btn btn-gray" onclick="cerrarModal()">Cerrar</button></div>
 </div></div>
+<div class="modal" id="modalEditarVisita"><div class="modal-box">
+  <h3 id="tituloEditarVisita">✏️ Corregir visita de hoy</h3>
+  <label style="font-size:15px;font-weight:800">¿Qué pasó al final?</label>
+  <select id="editTipo"><option value="compro">✅ COMPRÓ</option><option value="nocompro">❌ NO COMPRÓ</option></select>
+  <div id="editBoxMonto"><label style="font-size:15px;font-weight:800">¿Cuánto compró?</label><input id="editMonto" type="number" inputmode="numeric" placeholder="Ej: 45000"></div>
+  <div id="editBoxMotivo" style="display:none"><label style="font-size:15px;font-weight:800">¿Por qué no compró?</label><div id="editMotivos"></div></div>
+  <div class="row" style="margin-top:10px"><button class="btn btn-gray" onclick="cerrarModal()">Cancelar</button><button class="btn btn-naranja" onclick="guardarEdicionVisita()">💾 Guardar corrección</button></div>
+  <div class="row" style="margin-top:8px"><button class="btn" style="background:#D92D20;color:#fff" onclick="borrarVisitaHoy()">🗑️ Borrar visita de hoy y dejar pendiente</button></div>
+</div></div>
 <script>
 let clientes = JSON.parse(localStorage.getItem('lopez_clientes')||'[]');
 let visitas = JSON.parse(localStorage.getItem('lopez_visitas')||'[]');
@@ -158,6 +168,7 @@ let filtroDia = 'Todos';
 let clienteActual = null;
 let clienteEditarId = null;
 let motivoSel = '';
+let motivoEditSel = '';
 let latNuevo = null, lngNuevo = null;
 let latEditar = null, lngEditar = null;
 let mapa = null, marcadores = [];
@@ -180,7 +191,7 @@ function mostrar(sec){
   if(sec=='mapa') setTimeout(initMapa,100);
   window.scrollTo({top:0, behavior:'smooth'});
 }
-function cerrarModal(){ document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open')); clienteActual=null; motivoSel=''; }
+function cerrarModal(){ document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open')); clienteActual=null; motivoSel=''; motivoEditSel=''; }
 function verHistorial(id){
   let c = clientes.find(x=>x.id==id); if(!c) return;
   let hist = visitas.filter(v=>v.clienteId==id).sort((a,b)=> (b.fecha+' '+(b.hora||'')).localeCompare(a.fecha+' '+(a.hora||'')));
@@ -210,6 +221,45 @@ function verEnMapa(id){
   mostrar('mapa');
   setTimeout(()=>{ if(mapa){ mapa.setView([c.lat, c.lng], 16); } }, 400);
 }
+// CORRECCION 1 - EDITAR VISITA
+function abrirEditarVisita(id){
+  let v = visitas.find(x=>x.clienteId==id && x.fecha==hoy); if(!v){ alert('Hoy todavía no lo visitaste'); return; }
+  clienteActual = id;
+  let c = clientes.find(x=>x.id==id);
+  document.getElementById('tituloEditarVisita').innerText = '✏️ Corregir visita: '+c.nombre;
+  document.getElementById('editTipo').value = v.compro ? 'compro' : 'nocompro';
+  document.getElementById('editMonto').value = v.monto||'';
+  motivoEditSel = v.motivo||'';
+  let h=''; motivos.forEach(m=>{ h+=`<div class="motivo ${m==motivoEditSel?'sel':''}" onclick="seleccionarMotivoEdit(this,'${m}')">${m}</div>`; });
+  document.getElementById('editMotivos').innerHTML=h;
+  actualizarEditTipo();
+  document.getElementById('modalEditarVisita').classList.add('open');
+}
+function actualizarEditTipo(){
+  let t=document.getElementById('editTipo').value;
+  document.getElementById('editBoxMonto').style.display = t=='compro' ? 'block' : 'none';
+  document.getElementById('editBoxMotivo').style.display = t=='nocompro' ? 'block' : 'none';
+}
+document.addEventListener('change',e=>{ if(e.target && e.target.id=='editTipo') actualizarEditTipo(); });
+function seleccionarMotivoEdit(el,m){ document.querySelectorAll('#editMotivos .motivo').forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); motivoEditSel=m; }
+function guardarEdicionVisita(){
+  let v = visitas.find(x=>x.clienteId==clienteActual && x.fecha==hoy); if(!v) return;
+  let tipo=document.getElementById('editTipo').value;
+  if(tipo=='compro'){
+    let monto=parseFloat(document.getElementById('editMonto').value||'0');
+    if(!monto){ alert('Poné el monto'); return; }
+    v.compro=true; v.monto=monto; v.motivo=''; v.hora=horaAhora();
+  } else {
+    if(!motivoEditSel){ alert('Elegí un motivo'); return; }
+    v.compro=false; v.monto=0; v.motivo=motivoEditSel; v.hora=horaAhora();
+  }
+  guardar(); cerrarModal(); render(); alert('Visita corregida ✅');
+}
+function borrarVisitaHoy(){
+  if(!confirm('¿Borrar la visita de hoy y dejarlo como pendiente?')) return;
+  visitas=visitas.filter(x=>!(x.clienteId==clienteActual && x.fecha==hoy));
+  guardar(); cerrarModal(); render();
+}
 function editarCliente(id){
   let c = clientes.find(x=>x.id==id); if(!c) return;
   clienteEditarId = id; latEditar = c.lat; lngEditar = c.lng; clienteParaCentrar = c;
@@ -230,6 +280,30 @@ function usarMiUbicacionEditar(){
   if(miLat!=null){ fijarUbicacionEditar(miLat, miLng); return; }
   if(!navigator.geolocation){ alert('Sin GPS. Mantené apretado 2 seg en el mapa.'); return; }
   navigator.geolocation.getCurrentPosition(p=>{ fijarUbicacionEditar(p.coords.latitude, p.coords.longitude); }, ()=>alert('No se pudo obtener ubicación'), {enableHighAccuracy:true, timeout:10000});
+}
+// CORRECCION 2 - BUSCAR DIRECCION MANUAL
+async function buscarDireccionTexto(texto){
+  let q=encodeURIComponent(texto+', Córdoba, Argentina');
+  let r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+q, {headers:{'Accept':'application/json'}});
+  let j=await r.json(); return j;
+}
+async function buscarDireccionNuevo(){
+  let d=document.getElementById('nDir').value.trim();
+  if(!d){ alert('Primero escribí la dirección. Ej: Av Colón 123'); return; }
+  try{
+    let j=await buscarDireccionTexto(d);
+    if(j.length){ fijarUbicacionNueva(parseFloat(j[0].lat), parseFloat(j[0].lon), '📌 '+j[0].display_name.split(',')[0]); if(mapa) mapa.setView([parseFloat(j[0].lat), parseFloat(j[0].lon)],16); }
+    else alert('No encontré esa dirección. Probá con altura y barrio. Ej: Duarte Quirós 2272, Córdoba');
+  }catch(e){ alert('Sin internet para buscar la dirección. Mantené apretado 2 seg en el mapa.'); }
+}
+async function buscarDireccionEditar(){
+  let d=document.getElementById('eDir').value.trim();
+  if(!d){ alert('Primero escribí la dirección. Ej: Av Colón 123'); return; }
+  try{
+    let j=await buscarDireccionTexto(d);
+    if(j.length){ fijarUbicacionEditar(parseFloat(j[0].lat), parseFloat(j[0].lon)); if(mapa) mapa.setView([parseFloat(j[0].lat), parseFloat(j[0].lon)],16); }
+    else alert('No encontré esa dirección. Probá con altura y barrio.');
+  }catch(e){ alert('Sin internet para buscar la dirección. Mantené apretado 2 seg en el mapa.'); }
 }
 function confirmarEditar(){
   let nombre = document.getElementById('eNombre').value.trim(); if(!nombre){ alert('Poné el nombre'); return; }
@@ -259,7 +333,7 @@ function usarMiUbicacionNuevo(){
 }
 function guardarCliente(){
   let nombre = document.getElementById('nNombre').value.trim(); if(!nombre){ alert('Poné el nombre'); return; }
-  if(latNuevo==null){ alert('Primero marcá la ubicación en el mapa (mantené apretado 2 seg) o tocá Usar mi ubicación'); return; }
+  if(latNuevo==null){ alert('Primero buscá la dirección o marcá la ubicación en el mapa (mantené apretado 2 seg) o tocá Usar mi ubicación'); return; }
   clientes.push({id:Date.now(), nombre, dir:document.getElementById('nDir').value.trim(), tel:document.getElementById('nTel').value.trim(), dia:document.getElementById('nDia').value, lat:latNuevo, lng:lngNuevo});
   guardar(); document.getElementById('nNombre').value=''; document.getElementById('nDir').value=''; document.getElementById('nTel').value=''; document.getElementById('nDia').value=''; limpiarUbicacionNueva(); render(); alert('Cliente guardado ✅'); mostrar('lista');
 }
@@ -285,13 +359,14 @@ function render(){
     let v=visitas.find(x=>x.clienteId==c.id && x.fecha==hoy);
     let clase=v ? (v.compro?'compro':'nocompro') : '';
     let estado=v ? (v.compro? `<div class="ok">✅ COMPRÓ $${v.monto.toLocaleString('es-AR')} - ${v.hora||''}</div>` : `<div class="no">❌ NO COMPRÓ: ${v.motivo} - ${v.hora||''}</div>`) : '<div style="color:#888;font-weight:700;margin:8px 0">⏳ Sin visitar hoy</div>';
+    let btnEditarVisita = v ? `<div class="row" style="margin-top:8px"><button class="btn btn-naranja" onclick="abrirEditarVisita(${c.id})">✏️ Corregir visita de hoy</button></div>` : '';
     let histC=visitas.filter(x=>x.clienteId==c.id).sort((a,b)=> (b.fecha+' '+(b.hora||'')).localeCompare(a.fecha+' '+(a.hora||'')));
     let ultCompra=histC.find(x=>x.compro); let ultNo=histC.find(x=>!x.compro);
     let miniHist='';
     if(ultCompra) miniHist+=`<small>🟢 Últ. compra: ${formatearFecha(ultCompra.fecha)} - $${ultCompra.monto.toLocaleString('es-AR')}</small><br>`;
     if(ultNo) miniHist+=`<small>🔴 Últ. no compra: ${formatearFecha(ultNo.fecha)} - ${ultNo.motivo}</small><br>`;
     let dis=v?'disabled style="opacity:.5"':'';
-    html+=`<div class="card cliente ${clase}"><b>${c.nombre}</b> ${c.dia?`<span class="badge">📅 ${c.dia}</span>`:''}<br><small>${c.dir||''} ${c.tel?' - '+c.tel:''}</small><br>${miniHist}${estado}<div class="row"><button class="btn btn-green" ${dis} onclick="abrirCompro(${c.id})">✅ COMPRÓ</button><button class="btn" style="background:#D92D20;color:#fff" ${dis} onclick="abrirNoCompro(${c.id})">❌ NO COMPRÓ</button></div><div class="row" style="margin-top:8px"><button class="btn btn-violeta" onclick="verHistorial(${c.id})">📜 Historial</button><button class="btn btn-blue" onclick="verEnMapa(${c.id})">🗺️ Ver en mapa</button></div><div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="editarCliente(${c.id})">✏️ Editar</button><button class="btn btn-gray" onclick="borrarCliente(${c.id})">🗑️ Borrar</button></div></div>`;
+    html+=`<div class="card cliente ${clase}"><b>${c.nombre}</b> ${c.dia?`<span class="badge">📅 ${c.dia}</span>`:''}<br><small>${c.dir||''} ${c.tel?' - '+c.tel:''}</small><br>${miniHist}${estado}${btnEditarVisita}<div class="row" style="margin-top:8px"><button class="btn btn-green" ${dis} onclick="abrirCompro(${c.id})">✅ COMPRÓ</button><button class="btn" style="background:#D92D20;color:#fff" ${dis} onclick="abrirNoCompro(${c.id})">❌ NO COMPRÓ</button></div><div class="row" style="margin-top:8px"><button class="btn btn-violeta" onclick="verHistorial(${c.id})">📜 Historial</button><button class="btn btn-blue" onclick="verEnMapa(${c.id})">🗺️ Ver en mapa</button></div><div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="editarCliente(${c.id})">✏️ Editar</button><button class="btn btn-gray" onclick="borrarCliente(${c.id})">🗑️ Borrar</button></div></div>`;
   });
   document.getElementById('lista').innerHTML = html || '<div class="card">No hay clientes. Si filtraste por día, probá con Todos.</div>';
   if(mapa) dibujarMarcadores();
