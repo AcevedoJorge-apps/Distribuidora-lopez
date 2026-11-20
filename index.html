@@ -21,7 +21,7 @@ header h1{margin:0;font-size:26px;font-weight:900;letter-spacing:.5px;line-heigh
 .buscador-fijo input{margin:0}
 input,select{width:100%;padding:12px;margin:7px 0;border:2px solid #DDD;border-radius:10px;font-size:18px;font-weight:600;color:#111;background:#fff}
 button{cursor:pointer} .btn{background:#111;color:#fff;border:0;padding:11px 10px;border-radius:10px;width:100%;font-weight:800;font-size:18px;line-height:1.2}
-.btn-green{background:#1E7A34;color:#fff} .btn-blue{background:#0B5ED7;color:#fff} .btn-gray{background:#EEE;color:#111;border:2px solid #DDD} .btn-violeta{background:#6B2FBF;color:#fff} .btn-gps-on{background:#1E7A34;color:#fff} .btn-gps-off{background:#111;color:#fff} .btn-naranja{background:#E86A00;color:#fff}
+.btn-green{background:#1E7A34;color:#fff} .btn-blue{background:#0B5ED7;color:#fff} .btn-gray{background:#EEE;color:#111;border:2px solid #DDD} .btn-violeta{background:#6B2FBF;color:#fff} .btn-gps-on{background:#1E7A34;color:#fff} .btn-gps-off{background:#111;color:#fff} .btn-naranja{background:#E86A00;color:#fff} .btn-ws{background:#25D366;color:#fff}
 .row{display:flex;gap:8px} .row button{flex:1}
 .cliente{border-left:6px solid #111}
 .cliente.compro{border-left-color:#1E7A34} .cliente.nocompro{border-left-color:#D92D20}
@@ -57,6 +57,7 @@ button{cursor:pointer} .btn{background:#111;color:#fff;border:0;padding:11px 10p
 .gps-estado{font-size:14px;text-align:center;margin-top:6px;color:#555;font-weight:700}
 .gps-estado.on{color:#145A26;font-weight:800}
 .histItem{padding:10px;border-bottom:1px solid #eee;font-size:16px;line-height:1.4}
+.opciones-extra{display:none;margin-top:8px} .opciones-extra.open{display:block}
 .firma{background:#111;color:#fff;text-align:center;padding:22px 12px 26px;margin:22px 12px 10px;border-radius:16px;border-bottom:5px solid #D9A441}
 .firma-logo{width:78px;height:78px;background:#111;color:#D9A441;border:3px double #D9A441;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:32px;font-weight:900;letter-spacing:1px;box-shadow:0 0 0 3px #111,0 0 0 5px #D9A441}
 .firma b{font-size:20px;letter-spacing:2px;color:#fff}
@@ -194,6 +195,24 @@ function mostrar(sec){
   window.scrollTo({top:0, behavior:'smooth'});
 }
 function cerrarModal(){ document.querySelectorAll('.modal').forEach(m=>m.classList.remove('open')); clienteActual=null; motivoSel=''; motivoEditSel=''; }
+function toggleOpciones(id, btn){
+  let el=document.getElementById('op-'+id);
+  let abierto = el.classList.contains('open');
+  document.querySelectorAll('.opciones-extra').forEach(x=>x.classList.remove('open'));
+  document.querySelectorAll('.btn-mas').forEach(b=>b.innerText='⋯ Más opciones');
+  if(!abierto){ el.classList.add('open'); btn.innerText='▲ Ocultar opciones'; }
+}
+function whatsappLink(tel){
+  if(!tel) return '';
+  let n=tel.replace(/\D/g,'');
+  if(n.startsWith('0')) n=n.slice(1);
+  if(n.startsWith('54') && n.length>=12){ }
+  else if(n.length==10){ n='549'+n; }
+  else if(n.length==11 && n.startsWith('9')){ n='54'+n; }
+  else if(!n.startsWith('54')){ n='549'+n; }
+  let msg=encodeURIComponent('Hola soy de distribuidora López.');
+  return 'https://wa.me/'+n+'?text='+msg;
+}
 function verHistorial(id){
   let c = clientes.find(x=>x.id==id); if(!c) return;
   let hist = visitas.filter(v=>v.clienteId==id).sort((a,b)=> (b.fecha+' '+(b.hora||'')).localeCompare(a.fecha+' '+(a.hora||'')));
@@ -360,14 +379,15 @@ function render(){
     let v=visitas.find(x=>x.clienteId==c.id && x.fecha==hoy);
     let clase=v ? (v.compro?'compro':'nocompro') : '';
     let estado=v ? (v.compro? `<div class="ok">✅ COMPRÓ $${v.monto.toLocaleString('es-AR')} - ${v.hora||''}</div>` : `<div class="no">❌ NO COMPRÓ: ${v.motivo} - ${v.hora||''}</div>`) : '<div style="color:#888;font-weight:700;margin:8px 0">⏳ Sin visitar hoy</div>';
-    let btnEditarVisita = v ? `<div class="row" style="margin-top:8px"><button class="btn btn-naranja" onclick="abrirEditarVisita(${c.id})">✏️ Corregir visita de hoy</button></div>` : '';
     let histC=visitas.filter(x=>x.clienteId==c.id).sort((a,b)=> (b.fecha+' '+(b.hora||'')).localeCompare(a.fecha+' '+(a.hora||'')));
     let ultCompra=histC.find(x=>x.compro); let ultNo=histC.find(x=>!x.compro);
     let miniHist='';
     if(ultCompra) miniHist+=`<small>🟢 Últ. compra: ${formatearFecha(ultCompra.fecha)} - $${ultCompra.monto.toLocaleString('es-AR')}</small><br>`;
     if(ultNo) miniHist+=`<small>🔴 Últ. no compra: ${formatearFecha(ultNo.fecha)} - ${ultNo.motivo}</small><br>`;
     let dis=v?'disabled style="opacity:.5"':'';
-    html+=`<div class="card cliente ${clase}"><b>${c.nombre}</b> ${c.dia?`<span class="badge">📅 ${c.dia}</span>`:''}<br><small>${c.dir||''} ${c.tel?' - '+c.tel:''}</small><br>${miniHist}${estado}${btnEditarVisita}<div class="row" style="margin-top:8px"><button class="btn btn-green" ${dis} onclick="abrirCompro(${c.id})">✅ COMPRÓ</button><button class="btn" style="background:#D92D20;color:#fff" ${dis} onclick="abrirNoCompro(${c.id})">❌ NO COMPRÓ</button></div><div class="row" style="margin-top:8px"><button class="btn btn-violeta" onclick="verHistorial(${c.id})">📜 Historial</button><button class="btn btn-blue" onclick="verEnMapa(${c.id})">🗺️ Ver en mapa</button></div><div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="editarCliente(${c.id})">✏️ Editar</button><button class="btn btn-gray" onclick="borrarCliente(${c.id})">🗑️ Borrar</button></div></div>`;
+    let wsBtn = c.tel ? `<div class="row" style="margin-top:8px"><button class="btn btn-ws" onclick="window.open('${whatsappLink(c.tel)}','_blank')">💬 WhatsApp</button></div>` : '';
+    let btnCorregir = v ? `<div class="row" style="margin-top:8px"><button class="btn btn-naranja" onclick="abrirEditarVisita(${c.id})">✏️ Corregir visita de hoy</button></div>` : '';
+    html+=`<div class="card cliente ${clase}"><b>${c.nombre}</b> ${c.dia?`<span class="badge">📅 ${c.dia}</span>`:''}<br><small>${c.dir||''} ${c.tel?' - '+c.tel:''}</small><br>${miniHist}${estado}<div class="row" style="margin-top:8px"><button class="btn btn-green" ${dis} onclick="abrirCompro(${c.id})">✅ COMPRÓ</button><button class="btn" style="background:#D92D20;color:#fff" ${dis} onclick="abrirNoCompro(${c.id})">❌ NO COMPRÓ</button></div><div class="row" style="margin-top:8px"><button class="btn btn-gray btn-mas" onclick="toggleOpciones(${c.id}, this)">⋯ Más opciones</button></div><div id="op-${c.id}" class="opciones-extra">${wsBtn}${btnCorregir}<div class="row" style="margin-top:8px"><button class="btn btn-violeta" onclick="verHistorial(${c.id})">📜 Historial</button><button class="btn btn-blue" onclick="verEnMapa(${c.id})">🗺️ Ver en mapa</button></div><div class="row" style="margin-top:8px"><button class="btn btn-gray" onclick="editarCliente(${c.id})">✏️ Editar cliente</button><button class="btn btn-gray" onclick="borrarCliente(${c.id})">🗑️ Borrar</button></div></div></div>`;
   });
   document.getElementById('lista').innerHTML = html || '<div class="card">No hay clientes. Si filtraste por día, probá con Todos.</div>';
   if(mapa) dibujarMarcadores();
